@@ -25,7 +25,7 @@ sudo apt-get update
 sudo apt-get install python3-picamera2
 
 # 3. Verify installation
-python3 -c "import picamera2; print('✅ picamera2 installed!')"
+python3 -c 'import picamera2; print("picamera2 installed successfully")'
 
 # 4. Run the detector
 source venv/bin/activate
@@ -55,7 +55,7 @@ sudo apt-get update
 sudo apt-get install python3-picamera2
 
 # 2. Verify it's installed
-python3 -c "import picamera2; print('✅ picamera2 installed!')"
+python3 -c 'import picamera2; print("picamera2 installed successfully")'
 
 # 3. Go to your project
 cd ~/rasp-object-detection/rpi5_yolo_whisper
