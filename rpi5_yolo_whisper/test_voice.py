@@ -175,7 +175,7 @@ def test_speech_recognition():
             return False
         
         print("✅ Audio recorded, transcribing...")
-        text = recognizer.transcribe(audio_data)
+        text = recognizer.transcribe_audio(audio_data)
         
         if text:
             print(f"✅ Transcription: '{text}'")

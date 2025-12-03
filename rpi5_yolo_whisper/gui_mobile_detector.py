@@ -564,7 +564,7 @@ class MobileGUIDetector:
                 self.root.after(0, self.status_label.config,
                               {'text': "🎤 Processing your command..."})
                 
-                command_text = self.speech_recognizer.transcribe(audio_data)
+                command_text = self.speech_recognizer.transcribe_audio(audio_data)
                 
                 if command_text:
                     logger.info(f"✅ Command recognized: '{command_text}'")
