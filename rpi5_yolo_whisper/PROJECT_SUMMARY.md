@@ -15,10 +15,13 @@ A **complete voice-activated object detection system** for Raspberry Pi 5 that c
 ## ✨ Key Features
 
 - 🎤 **Voice-activated**: Say "IRIS" to trigger
+- 🖥️ **GUI Mode**: Live video feed with bounding boxes (TigerVNC compatible)
+- 📱 **Remote Access**: Access via VNC from PC or phone
 - 🎯 **Real-time object detection**: YOLO11n optimized for Pi 5
 - 🔒 **Fully offline**: No internet required after setup
 - 💬 **Natural language**: Describes what it sees in plain English
 - 🚀 **Optimized for Raspberry Pi 5**: Fast inference on Pi hardware
+- ⌨️ **Manual controls**: Keyboard shortcuts for quick detection
 
 ## 📦 What's Included
 
@@ -26,21 +29,26 @@ A **complete voice-activated object detection system** for Raspberry Pi 5 that c
 
 | File | Purpose |
 |------|---------|
-| `main_rpi5.py` | Main application (integrates everything) |
+| `main_rpi5.py` | Terminal version (voice-only, no GUI) |
+| `main_gui.py` | **GUI version (live video + TigerVNC)** |
 | `yolo_detector.py` | YOLO object detection (from yolo2) |
 | `whisper_stt.py` | Whisper speech-to-text (from whisper rasp) |
 | `offline_tts.py` | Text-to-speech (from whisper rasp) |
 | `offline_wake_word.py` | Wake word detection (from whisper rasp) |
 | `requirements_rpi5.txt` | All Python dependencies |
 | `install_rpi5.sh` | Automatic installation script for Pi |
+| `start_gui.sh` | Quick start script for GUI |
+| `start_terminal.sh` | Quick start script for terminal |
 | `.env` | Configuration file |
 
 ### Documentation
 
 | File | Contents |
 |------|----------|
-| `README_RPI5.md` | Complete documentation (400+ lines) |
+| `README_RPI5.md` | Complete documentation (450+ lines) |
 | `QUICKSTART.md` | Quick start guide for Pi and Windows |
+| `TIGERVNC_SETUP.md` | **Detailed TigerVNC + GUI setup guide** |
+| `RASPBERRY_PI_SETUP.md` | **Complete step-by-step setup** |
 | `PROJECT_SUMMARY.md` | This file |
 
 ### Models
