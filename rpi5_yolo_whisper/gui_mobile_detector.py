@@ -1,0 +1,711 @@
+"""
+Mobile-Ready GUI Object Detector with Voice Commands
+Designed for mobile app integration with enhanced controls
+"""
+
+import os
+import sys
+import cv2
+import time
+import logging
+import threading
+from collections import Counter
+from dotenv import load_dotenv
+
+import tkinter as tk
+from tkinter import ttk
+from PIL import Image, ImageTk
+
+from yolo_detector import YOLODetector
+from offline_tts import TextToSpeech
+from offline_wake_word import OfflineWakeWordDetector
+from whisper_stt import WhisperRecognizer
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+class MobileGUIDetector:
+    """Mobile-ready GUI detector with voice commands and enhanced controls"""
+    
+    def __init__(self, config=None):
+        """Initialize mobile GUI detector"""
+        self.config = config or self._load_config()
+        
+        # Initialize components
+        logger.info("Initializing components...")
+        self._initialize_components()
+        
+        # Detection state
+        self.running = False
+        self.detecting = False
+        self.voice_listening = False
+        self.last_announcement = time.time()
+        self.announcement_cooldown = 3.0
+        self.last_detected_objects = set()
+        
+        # Statistics
+        self.total_detections = 0
+        self.session_start = time.time()
+        
+        # Create GUI
+        self._create_gui()
+        
+        logger.info("✅ Mobile GUI Object Detector initialized")
+    
+    def _load_config(self):
+        """Load configuration from .env"""
+        load_dotenv()
+        
+        config = {
+            'yolo_model': os.getenv('YOLO_MODEL', 'models/yolo11n.pt'),
+            'yolo_confidence': float(os.getenv('YOLO_CONFIDENCE', '0.5')),
+            'camera_type': os.getenv('CAMERA_TYPE', 'picamera'),
+            'camera_index': int(os.getenv('CAMERA_INDEX', '0')),
+            'camera_width': int(os.getenv('CAMERA_WIDTH', '640')),
+            'camera_height': int(os.getenv('CAMERA_HEIGHT', '480')),
+            'tts_engine': os.getenv('TTS_ENGINE', 'pyttsx3'),
+            'tts_rate': int(os.getenv('TTS_RATE', '150')),
+            'tts_volume': float(os.getenv('TTS_VOLUME', '1.0')),
+            'wake_word': os.getenv('WAKE_WORD', 'iris'),
+            'whisper_model': os.getenv('WHISPER_MODEL', 'small'),
+            'sample_rate': int(os.getenv('SAMPLE_RATE', '16000')),
+        }
+        
+        return config
+    
+    def _initialize_components(self):
+        """Initialize all components"""
+        # Initialize TTS
+        logger.info("Initializing Text-to-Speech...")
+        self.tts = TextToSpeech(
+            engine=self.config['tts_engine'],
+            rate=self.config['tts_rate'],
+            volume=self.config['tts_volume']
+        )
+        
+        # Initialize YOLO
+        logger.info("Initializing YOLO detector...")
+        self.yolo = YOLODetector(
+            model_path=self.config['yolo_model'],
+            confidence_threshold=self.config['yolo_confidence'],
+            camera_type=self.config['camera_type'],
+            camera_index=self.config['camera_index'],
+            width=self.config['camera_width'],
+            height=self.config['camera_height']
+        )
+        
+        # Initialize Speech Recognition
+        logger.info("Initializing Whisper...")
+        self.speech_recognizer = WhisperRecognizer(
+            model_size=self.config['whisper_model'],
+            device='cpu',
+            sample_rate=self.config['sample_rate'],
+            use_faster_whisper=True
+        )
+        
+        # Initialize Wake Word Detector
+        logger.info("Initializing Wake Word Detector...")
+        self.wake_detector = OfflineWakeWordDetector(
+            wake_word=self.config['wake_word'],
+            model_size='tiny',
+            sample_rate=self.config['sample_rate']
+        )
+    
+    def _create_gui(self):
+        """Create mobile-ready GUI interface"""
+        self.root = tk.Tk()
+        self.root.title("🎯 Mobile Object Detector")
+        self.root.geometry("1000x800")
+        self.root.configure(bg='#1e1e1e')
+        
+        # Style configuration
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # Custom colors
+        bg_dark = '#1e1e1e'
+        bg_medium = '#2d2d2d'
+        fg_light = '#ffffff'
+        accent_blue = '#0078d4'
+        accent_green = '#107c10'
+        
+        style.configure('Dark.TFrame', background=bg_dark)
+        style.configure('Medium.TFrame', background=bg_medium)
+        style.configure('Title.TLabel', background=bg_dark, foreground=fg_light, 
+                       font=('Arial', 18, 'bold'))
+        style.configure('Info.TLabel', background=bg_medium, foreground=fg_light, 
+                       font=('Arial', 11))
+        style.configure('Status.TLabel', background=bg_medium, foreground='#00ff00', 
+                       font=('Arial', 10, 'bold'))
+        style.configure('Control.TButton', font=('Arial', 11, 'bold'))
+        
+        # Main container
+        main_frame = ttk.Frame(self.root, style='Dark.TFrame', padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # ===== HEADER =====
+        header_frame = ttk.Frame(main_frame, style='Dark.TFrame')
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        title_label = ttk.Label(
+            header_frame,
+            text="🎯 AI Object Detector",
+            style='Title.TLabel'
+        )
+        title_label.pack()
+        
+        # ===== VIDEO FEED =====
+        video_container = ttk.LabelFrame(main_frame, text="📹 Live Camera Feed", 
+                                        padding="5", style='Medium.TFrame')
+        video_container.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        self.video_label = ttk.Label(video_container, text="Camera initializing...",
+                                     background='black', foreground='white')
+        self.video_label.pack(fill=tk.BOTH, expand=True)
+        
+        # ===== CONTROLS PANEL =====
+        controls_frame = ttk.LabelFrame(main_frame, text="⚙️ Controls", 
+                                       padding="10", style='Medium.TFrame')
+        controls_frame.pack(fill=tk.X, pady=5)
+        
+        # Row 1: Main action buttons
+        btn_row1 = ttk.Frame(controls_frame, style='Medium.TFrame')
+        btn_row1.pack(fill=tk.X, pady=5)
+        
+        self.voice_button = tk.Button(
+            btn_row1,
+            text="🎤 Voice Control: OFF",
+            command=self.toggle_voice_control,
+            bg='#d13438',
+            fg='white',
+            font=('Arial', 12, 'bold'),
+            height=2,
+            relief=tk.RAISED,
+            borderwidth=3
+        )
+        self.voice_button.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        self.manual_button = tk.Button(
+            btn_row1,
+            text="▶ Manual Start",
+            command=self.toggle_detection,
+            bg='#107c10',
+            fg='white',
+            font=('Arial', 12, 'bold'),
+            height=2,
+            relief=tk.RAISED,
+            borderwidth=3
+        )
+        self.manual_button.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        # Row 2: Secondary buttons
+        btn_row2 = ttk.Frame(controls_frame, style='Medium.TFrame')
+        btn_row2.pack(fill=tk.X, pady=5)
+        
+        announce_btn = tk.Button(
+            btn_row2,
+            text="🔊 Announce",
+            command=self.announce_objects,
+            bg='#0078d4',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            relief=tk.RAISED
+        )
+        announce_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        reset_btn = tk.Button(
+            btn_row2,
+            text="🔄 Reset Stats",
+            command=self.reset_stats,
+            bg='#8a8a8a',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            relief=tk.RAISED
+        )
+        reset_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        quit_btn = tk.Button(
+            btn_row2,
+            text="❌ Quit",
+            command=self.quit,
+            bg='#d13438',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            relief=tk.RAISED
+        )
+        quit_btn.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        # ===== SETTINGS PANEL =====
+        settings_frame = ttk.LabelFrame(main_frame, text="🎛️ Detection Settings", 
+                                       padding="10", style='Medium.TFrame')
+        settings_frame.pack(fill=tk.X, pady=5)
+        
+        # Confidence threshold
+        conf_frame = ttk.Frame(settings_frame, style='Medium.TFrame')
+        conf_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(conf_frame, text="Confidence Threshold:", 
+                 style='Info.TLabel').pack(side=tk.LEFT, padx=5)
+        
+        self.confidence_var = tk.DoubleVar(value=self.config['yolo_confidence'])
+        self.confidence_slider = ttk.Scale(
+            conf_frame,
+            from_=0.1,
+            to=0.9,
+            orient=tk.HORIZONTAL,
+            variable=self.confidence_var,
+            command=self.update_confidence
+        )
+        self.confidence_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        self.confidence_value_label = ttk.Label(
+            conf_frame,
+            text=f"{self.config['yolo_confidence']:.2f}",
+            style='Info.TLabel',
+            width=6
+        )
+        self.confidence_value_label.pack(side=tk.LEFT, padx=5)
+        
+        # NMS threshold (IoU)
+        nms_frame = ttk.Frame(settings_frame, style='Medium.TFrame')
+        nms_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(nms_frame, text="NMS IoU Threshold:", 
+                 style='Info.TLabel').pack(side=tk.LEFT, padx=5)
+        
+        self.nms_var = tk.DoubleVar(value=0.45)
+        self.nms_slider = ttk.Scale(
+            nms_frame,
+            from_=0.1,
+            to=0.9,
+            orient=tk.HORIZONTAL,
+            variable=self.nms_var,
+            command=self.update_nms
+        )
+        self.nms_slider.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        self.nms_value_label = ttk.Label(
+            nms_frame,
+            text="0.45",
+            style='Info.TLabel',
+            width=6
+        )
+        self.nms_value_label.pack(side=tk.LEFT, padx=5)
+        
+        # Field of View / Image Size
+        fov_frame = ttk.Frame(settings_frame, style='Medium.TFrame')
+        fov_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(fov_frame, text="Field of View:", 
+                 style='Info.TLabel').pack(side=tk.LEFT, padx=5)
+        
+        self.fov_var = tk.StringVar(value="640x480")
+        fov_options = ["320x240", "640x480", "800x600", "1280x720"]
+        self.fov_combo = ttk.Combobox(
+            fov_frame,
+            textvariable=self.fov_var,
+            values=fov_options,
+            state='readonly',
+            width=12
+        )
+        self.fov_combo.pack(side=tk.LEFT, padx=5)
+        self.fov_combo.bind('<<ComboboxSelected>>', self.update_fov)
+        
+        # Auto-announce checkbox
+        self.auto_announce_var = tk.BooleanVar(value=True)
+        auto_check = ttk.Checkbutton(
+            settings_frame,
+            text="🔊 Auto-announce new objects",
+            variable=self.auto_announce_var,
+            style='Info.TLabel'
+        )
+        auto_check.pack(anchor=tk.W, pady=5)
+        
+        # ===== STATISTICS PANEL =====
+        stats_frame = ttk.LabelFrame(main_frame, text="📊 Detection Statistics", 
+                                     padding="10", style='Medium.TFrame')
+        stats_frame.pack(fill=tk.X, pady=5)
+        
+        stats_grid = ttk.Frame(stats_frame, style='Medium.TFrame')
+        stats_grid.pack(fill=tk.X)
+        
+        # Detection info
+        self.detection_label = ttk.Label(
+            stats_grid,
+            text="No objects detected",
+            style='Info.TLabel',
+            justify=tk.LEFT
+        )
+        self.detection_label.grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=2)
+        
+        # Stats row 1
+        ttk.Label(stats_grid, text="Objects:", 
+                 style='Info.TLabel').grid(row=1, column=0, sticky=tk.W, padx=5)
+        self.count_label = ttk.Label(stats_grid, text="0", style='Status.TLabel')
+        self.count_label.grid(row=1, column=1, sticky=tk.W)
+        
+        ttk.Label(stats_grid, text="FPS:", 
+                 style='Info.TLabel').grid(row=2, column=0, sticky=tk.W, padx=5)
+        self.fps_label = ttk.Label(stats_grid, text="0.0", style='Status.TLabel')
+        self.fps_label.grid(row=2, column=1, sticky=tk.W)
+        
+        ttk.Label(stats_grid, text="Total Detected:", 
+                 style='Info.TLabel').grid(row=3, column=0, sticky=tk.W, padx=5)
+        self.total_label = ttk.Label(stats_grid, text="0", style='Status.TLabel')
+        self.total_label.grid(row=3, column=1, sticky=tk.W)
+        
+        ttk.Label(stats_grid, text="Session Time:", 
+                 style='Info.TLabel').grid(row=4, column=0, sticky=tk.W, padx=5)
+        self.time_label = ttk.Label(stats_grid, text="00:00", style='Status.TLabel')
+        self.time_label.grid(row=4, column=1, sticky=tk.W)
+        
+        # ===== STATUS BAR =====
+        self.status_label = ttk.Label(
+            main_frame,
+            text="📍 Ready • Say 'IRIS DETECT' to start detection",
+            style='Info.TLabel',
+            relief=tk.SUNKEN,
+            anchor=tk.W,
+            padding=5
+        )
+        self.status_label.pack(fill=tk.X, pady=(5, 0))
+        
+        # Handle window close
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)
+    
+    def update_confidence(self, value):
+        """Update confidence threshold"""
+        conf = float(value)
+        self.yolo.confidence_threshold = conf
+        self.confidence_value_label.config(text=f"{conf:.2f}")
+    
+    def update_nms(self, value):
+        """Update NMS IoU threshold"""
+        nms = float(value)
+        self.nms_value_label.config(text=f"{nms:.2f}")
+        # Note: YOLO's NMS threshold can be updated if needed
+    
+    def update_fov(self, event=None):
+        """Update field of view (camera resolution)"""
+        fov = self.fov_var.get()
+        width, height = map(int, fov.split('x'))
+        logger.info(f"FOV changed to {width}x{height}")
+        # Note: Changing resolution requires camera reinitialization
+        # For now, just log it. Can be implemented to restart camera.
+    
+    def toggle_voice_control(self):
+        """Toggle voice control on/off"""
+        if not self.voice_listening:
+            self.start_voice_control()
+        else:
+            self.stop_voice_control()
+    
+    def start_voice_control(self):
+        """Start listening for voice commands"""
+        if self.voice_listening:
+            return
+        
+        self.voice_listening = True
+        self.voice_button.config(
+            text="🎤 Voice Control: ON",
+            bg='#107c10'
+        )
+        self.status_label.config(
+            text="🎤 Listening • Say 'IRIS DETECT' or 'IRIS STOP'"
+        )
+        
+        # Start voice thread
+        self.voice_thread = threading.Thread(target=self._voice_loop, daemon=True)
+        self.voice_thread.start()
+        
+        logger.info("Voice control started")
+        self.tts.speak("Voice control activated")
+    
+    def stop_voice_control(self):
+        """Stop listening for voice commands"""
+        self.voice_listening = False
+        self.voice_button.config(
+            text="🎤 Voice Control: OFF",
+            bg='#d13438'
+        )
+        self.status_label.config(text="📍 Voice control stopped")
+        logger.info("Voice control stopped")
+    
+    def _voice_loop(self):
+        """Voice command loop"""
+        while self.voice_listening:
+            try:
+                # Listen for wake word
+                logger.info("Listening for wake word...")
+                detected = self.wake_detector.listen_for_wake_word()
+                
+                if not detected or not self.voice_listening:
+                    continue
+                
+                logger.info("Wake word detected!")
+                self.root.after(0, self.status_label.config, 
+                              {'text': "🎤 Wake word detected! Listening..."})
+                
+                # Listen for command
+                audio_data = self.speech_recognizer.record_audio(
+                    duration=5,
+                    silence_threshold=0.01,
+                    max_silence_duration=2.0
+                )
+                
+                # Transcribe
+                command_text = self.speech_recognizer.transcribe(audio_data)
+                
+                if command_text:
+                    logger.info(f"Command: {command_text}")
+                    self.root.after(0, self._process_voice_command, command_text)
+                
+            except Exception as e:
+                logger.error(f"Voice loop error: {e}")
+                time.sleep(0.1)
+    
+    def _process_voice_command(self, command):
+        """Process voice command"""
+        command_lower = command.lower()
+        
+        if 'detect' in command_lower or 'start' in command_lower:
+            self.status_label.config(text=f"🎤 Command: '{command}' → Starting detection")
+            self.tts.speak("Starting detection")
+            self.start_detection()
+            
+        elif 'stop' in command_lower:
+            self.status_label.config(text=f"🎤 Command: '{command}' → Stopping detection")
+            self.tts.speak("Stopping detection")
+            self.stop_detection()
+            
+        elif 'what' in command_lower and 'see' in command_lower:
+            self.status_label.config(text=f"🎤 Command: '{command}' → Announcing")
+            self.announce_objects()
+        else:
+            self.status_label.config(text=f"🎤 Command not recognized: '{command}'")
+    
+    def toggle_detection(self):
+        """Toggle detection on/off (manual)"""
+        if not self.detecting:
+            self.start_detection()
+        else:
+            self.stop_detection()
+    
+    def start_detection(self):
+        """Start continuous detection"""
+        if self.detecting:
+            return
+        
+        self.detecting = True
+        self.manual_button.config(text="⏸ Stop Detection", bg='#d13438')
+        self.status_label.config(text="🎯 Detection running...")
+        
+        # Start detection thread
+        self.detection_thread = threading.Thread(target=self._detection_loop, daemon=True)
+        self.detection_thread.start()
+        
+        logger.info("Detection started")
+    
+    def stop_detection(self):
+        """Stop detection"""
+        self.detecting = False
+        self.manual_button.config(text="▶ Manual Start", bg='#107c10')
+        self.status_label.config(text="⏸ Detection stopped")
+        logger.info("Detection stopped")
+    
+    def _detection_loop(self):
+        """Main detection loop"""
+        fps_time = time.time()
+        fps_counter = 0
+        
+        while self.detecting:
+            try:
+                # Capture frame
+                frame = self.yolo.capture_frame()
+                if frame is None:
+                    time.sleep(0.1)
+                    continue
+                
+                # Detect objects
+                results = self.yolo.detect_objects(frame=frame, capture_new=False)
+                
+                if results:
+                    # Draw detections
+                    annotated_frame = self._draw_detections(frame, results['detections'])
+                    
+                    # Update GUI
+                    self.root.after(0, self._update_display, annotated_frame, results)
+                    
+                    # Update stats
+                    self.total_detections += results['count']
+                    self.root.after(0, self.total_label.config, {'text': str(self.total_detections)})
+                    
+                    # Check for new objects and announce
+                    if self.auto_announce_var.get():
+                        self._check_and_announce(results)
+                    
+                    fps_counter += 1
+                else:
+                    self.root.after(0, self._update_display, frame, None)
+                
+                # Calculate FPS
+                if time.time() - fps_time >= 1.0:
+                    fps = fps_counter / (time.time() - fps_time)
+                    self.root.after(0, self.fps_label.config, {'text': f"{fps:.1f}"})
+                    fps_counter = 0
+                    fps_time = time.time()
+                
+                # Update session time
+                session_time = int(time.time() - self.session_start)
+                mins, secs = divmod(session_time, 60)
+                self.root.after(0, self.time_label.config, {'text': f"{mins:02d}:{secs:02d}"})
+                
+            except Exception as e:
+                logger.error(f"Detection loop error: {e}")
+                time.sleep(0.1)
+    
+    def _draw_detections(self, frame, detections):
+        """Draw bounding boxes and labels"""
+        annotated = frame.copy()
+        
+        for det in detections:
+            x1, y1, x2, y2 = det['bbox']
+            label = f"{det['class']} {det['confidence']:.2f}"
+            
+            # Draw box
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # Draw label background
+            (label_width, label_height), _ = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+            )
+            cv2.rectangle(
+                annotated,
+                (x1, y1 - label_height - 10),
+                (x1 + label_width, y1),
+                (0, 255, 0),
+                -1
+            )
+            
+            # Draw label text
+            cv2.putText(
+                annotated,
+                label,
+                (x1, y1 - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (0, 0, 0),
+                2
+            )
+        
+        return annotated
+    
+    def _update_display(self, frame, results):
+        """Update GUI display"""
+        # Convert frame to PhotoImage
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(frame_rgb)
+        
+        # Resize to fit display
+        display_width = 900
+        aspect_ratio = img.height / img.width
+        display_height = int(display_width * aspect_ratio)
+        img = img.resize((display_width, display_height), Image.Resampling.LANCZOS)
+        
+        photo = ImageTk.PhotoImage(image=img)
+        self.video_label.config(image=photo)
+        self.video_label.image = photo
+        
+        # Update detection info
+        if results and results['count'] > 0:
+            self.detection_label.config(text=results['summary'])
+            self.count_label.config(text=str(results['count']))
+        else:
+            self.detection_label.config(text="No objects detected")
+            self.count_label.config(text="0")
+    
+    def _check_and_announce(self, results):
+        """Check for new objects and announce"""
+        if not results or results['count'] == 0:
+            return
+        
+        current_objects = set(results['classes'])
+        new_objects = current_objects - self.last_detected_objects
+        time_since_last = time.time() - self.last_announcement
+        
+        if new_objects and time_since_last >= self.announcement_cooldown:
+            self.announce_objects(results)
+            self.last_detected_objects = current_objects
+            self.last_announcement = time.time()
+        elif not new_objects:
+            self.last_detected_objects = current_objects
+    
+    def announce_objects(self, results=None):
+        """Announce detected objects"""
+        if results is None:
+            frame = self.yolo.capture_frame()
+            if frame:
+                results = self.yolo.detect_objects(frame=frame, capture_new=False)
+        
+        if results and results['count'] > 0:
+            announcement = f"I see {results['summary']}"
+            logger.info(f"Announcing: {announcement}")
+            threading.Thread(target=self.tts.speak, args=(announcement,), daemon=True).start()
+            self.status_label.config(text=f"🔊 Announced: {results['summary']}")
+        else:
+            announcement = "I don't see any objects"
+            threading.Thread(target=self.tts.speak, args=(announcement,), daemon=True).start()
+            self.status_label.config(text="🔊 No objects to announce")
+    
+    def reset_stats(self):
+        """Reset statistics"""
+        self.total_detections = 0
+        self.session_start = time.time()
+        self.total_label.config(text="0")
+        self.time_label.config(text="00:00")
+        self.status_label.config(text="📊 Statistics reset")
+        logger.info("Statistics reset")
+    
+    def quit(self):
+        """Quit the application"""
+        logger.info("Shutting down...")
+        self.detecting = False
+        self.voice_listening = False
+        self.running = False
+        
+        # Cleanup
+        if hasattr(self, 'yolo'):
+            self.yolo.release()
+        if hasattr(self, 'wake_detector'):
+            self.wake_detector.stop()
+        
+        self.root.quit()
+        self.root.destroy()
+    
+    def run(self):
+        """Run the GUI application"""
+        self.running = True
+        self.tts.speak("Mobile object detector ready")
+        logger.info("Starting Mobile GUI...")
+        self.root.mainloop()
+
+
+def main():
+    """Main entry point"""
+    try:
+        app = MobileGUIDetector()
+        app.run()
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
