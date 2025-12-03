@@ -566,14 +566,14 @@ class MobileGUIDetector:
                 
                 command_text = self.speech_recognizer.transcribe_audio(audio_data)
                 
-                if command_text:
+                if command_text and len(command_text.strip()) > 0:
                     logger.info(f"✅ Command recognized: '{command_text}'")
                     self.root.after(0, self._update_voice_status, 
                                   f"✅ Heard: '{command_text}'", '#00ff00')
                     self.root.after(0, self._process_voice_command, command_text)
                     time.sleep(2)  # Show result for 2 seconds
                 else:
-                    logger.warning("No text transcribed")
+                    logger.warning(f"No text transcribed (command_text='{command_text}')")
                     self.root.after(0, self._update_voice_status, "❌ Could not understand", '#ff0000')
                     self.root.after(0, self.status_label.config,
                                   {'text': "🎤 Could not understand command, try again"})
