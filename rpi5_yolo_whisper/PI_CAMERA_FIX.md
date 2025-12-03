@@ -67,7 +67,13 @@ pip install picamera2
 
 **Test camera separately:**
 ```bash
+# Newer Raspberry Pi OS (Bookworm+)
+rpicam-hello --timeout 2000
+rpicam-still -o test.jpg
+
+# Older Raspberry Pi OS
 libcamera-hello --timeout 2000
+libcamera-still -o test.jpg
 ```
 
 **If this fails:**
@@ -75,6 +81,7 @@ libcamera-hello --timeout 2000
 - Try different cable
 - Try different camera module
 - Check for physical damage
+- For Arducam cameras: Check if requires special drivers
 
 **If this works but Python fails:**
 ```bash
@@ -83,6 +90,11 @@ source venv/bin/activate
 pip uninstall picamera2
 pip install picamera2 --no-cache-dir
 ```
+
+**For Arducam IMX219 specifically:**
+- ✅ Works with standard picamera2 (no special drivers needed)
+- ✅ Raspberry Pi 5 fully supports IMX219 sensor
+- ✅ Should work exactly like official Pi Camera V2
 
 ---
 
@@ -110,6 +122,9 @@ pip install picamera2 --no-cache-dir
 
 4. **Test Camera**
    ```bash
+   # Newer OS (recommended)
+   rpicam-hello --timeout 2000
+   # or for older OS:
    libcamera-hello --timeout 2000
    # Should show preview window
    ```
@@ -169,6 +184,10 @@ Camera Module          Raspberry Pi Board
 ```bash
 vcgencmd get_camera
 # Should show: detected=1
+
+# Also test with rpicam/libcamera
+rpicam-still -t 0  # Take immediate photo (newer OS)
+# or: libcamera-still -o test.jpg  # older OS
 ```
 
 ---
@@ -208,7 +227,8 @@ vcgencmd get_camera
 ## ✅ Success Checklist
 
 - [ ] `vcgencmd get_camera` shows `detected=1`
-- [ ] `libcamera-hello` shows preview
+- [ ] `rpicam-hello` or `libcamera-hello` shows preview
+- [ ] `rpicam-still -t 0` takes a photo successfully
 - [ ] `.env` has `CAMERA_TYPE=picamera`
 - [ ] `python -c "import picamera2"` works
 - [ ] `./diagnose_camera.sh` shows all ✅
@@ -218,8 +238,33 @@ vcgencmd get_camera
 
 **If all checked, camera is ready! 🎉**
 
-## 📚 More Help
+## � Arducam IMX219 Notes
+
+**Your Camera: Arducam IMX219 8MP V2.3**
+
+✅ **Fully compatible** with Raspberry Pi 5 and picamera2
+✅ **No special drivers needed** - works like official Pi Camera V2
+✅ **8MP resolution** - Same as official Pi Camera V2
+✅ **Uses standard IMX219 sensor** - Excellent quality
+
+**Working Commands:**
+```bash
+# Your camera works with:
+rpicam-still -t 0           # Immediate photo (newer OS)
+rpicam-hello --timeout 2000 # Preview window
+vcgencmd get_camera         # Should show detected=1
+```
+
+**No Changes Needed:**
+- Configuration in `.env` is already correct (`CAMERA_TYPE=picamera`)
+- Python picamera2 library handles it automatically
+- Same performance as official Pi Camera
+
+---
+
+## �📚 More Help
 
 - **Full guide:** `RASPBERRY_PI_SETUP.md`
 - **Diagnostics:** `./diagnose_camera.sh`
 - **Official docs:** https://www.raspberrypi.com/documentation/computers/camera_software.html
+- **Arducam IMX219:** https://www.arducam.com/product/arducam-8mp-imx219/

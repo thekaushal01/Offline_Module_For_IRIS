@@ -49,11 +49,20 @@ else
 fi
 echo ""
 
-# Test libcamera
+# Test libcamera / rpicam
 echo "=========================================="
-echo "📸 Testing libcamera (Pi Camera):"
+echo "📸 Testing Camera Commands:"
 echo "=========================================="
-if command -v libcamera-hello &> /dev/null; then
+if command -v rpicam-hello &> /dev/null; then
+    echo "✅ rpicam-hello found (newer Raspberry Pi OS)"
+    echo "Running 2-second camera test..."
+    if timeout 3 rpicam-hello --timeout 2000 2>&1; then
+        echo "✅ Pi Camera test successful!"
+    else
+        echo "⚠️  Camera test may have issues"
+    fi
+elif command -v libcamera-hello &> /dev/null; then
+    echo "✅ libcamera-hello found (older Raspberry Pi OS)"
     echo "Running 2-second camera test..."
     if timeout 3 libcamera-hello --timeout 2000 2>&1 | grep -q "Preview window"; then
         echo "✅ Pi Camera test successful!"
@@ -61,8 +70,9 @@ if command -v libcamera-hello &> /dev/null; then
         echo "⚠️  Camera test may have issues"
     fi
 else
-    echo "⚠️  libcamera-hello not found"
+    echo "⚠️  Neither rpicam-hello nor libcamera-hello found"
     echo "   Install: sudo apt-get install libcamera-apps"
+    echo "   Or for newer OS: sudo apt-get install rpicam-apps"
 fi
 echo ""
 

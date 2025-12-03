@@ -5,8 +5,8 @@
 ### 📋 Prerequisites
 
 - **Raspberry Pi 5** (4GB+ RAM recommended)
-- **Raspberry Pi OS** (64-bit recommended)
-- **Camera**: USB webcam or Raspberry Pi Camera Module
+- **Raspberry Pi OS** (64-bit Bookworm recommended)
+- **Camera**: Raspberry Pi Camera Module (V1/V2/V3) or Arducam IMX219/IMX477 or USB webcam
 - **Audio**: Speaker or headphones for voice announcements
 - **Internet connection** (for initial setup only)
 
@@ -55,11 +55,15 @@ Navigate to: `Interface Options` → `Camera` → `Enable` → Reboot
 
 **Verify camera is working:**
 ```bash
-# Test Pi Camera
-libcamera-hello --timeout 2000
+# Test Pi Camera (newer Raspberry Pi OS)
+rpicam-hello --timeout 2000
 
 # Or take a test photo
-libcamera-still -o test.jpg
+rpicam-still -o test.jpg
+
+# Legacy commands (older OS versions)
+# libcamera-hello --timeout 2000
+# libcamera-still -o test.jpg
 ```
 
 **If using USB Webcam instead:**
@@ -238,8 +242,9 @@ This script will automatically check everything and tell you exactly what's wron
 vcgencmd get_camera
 # Should show: supported=1 detected=1
 
-# Test camera
-libcamera-hello --timeout 2000
+# Test camera (use rpicam-* for newer OS, libcamera-* for older)
+rpicam-hello --timeout 2000
+# or: libcamera-hello --timeout 2000
 
 # Check camera interface is enabled
 sudo raspi-config
