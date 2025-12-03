@@ -85,10 +85,23 @@ class YOLODetector:
                     self.cap.configure(config)
                     self.cap.start()
                     logger.info(f"✅ Pi Camera initialized ({self.width}x{self.height})")
-                except ImportError:
-                    logger.warning("picamera2 not available, falling back to USB camera")
+                except ImportError as e:
+                    logger.error("❌ picamera2 library not installed!")
+                    logger.error("Install it with: sudo apt-get install python3-picamera2")
+                    logger.warning("Attempting to fall back to USB camera...")
                     self.camera_type = 'usb'
                     self._initialize_camera()
+                except RuntimeError as e:
+                    logger.error(f"❌ Pi Camera not detected: {e}")
+                    logger.error("Please check:")
+                    logger.error("  1. Camera ribbon cable is properly connected")
+                    logger.error("  2. Camera is enabled: sudo raspi-config → Interface Options → Camera")
+                    logger.error("  3. Try: vcgencmd get_camera")
+                    raise RuntimeError("Pi Camera not detected. Check camera connection and enable camera in raspi-config.")
+                except Exception as e:
+                    logger.error(f"❌ Failed to initialize Pi Camera: {e}")
+                    logger.error(f"Error type: {type(e).__name__}")
+                    raise
                     
             elif self.camera_type == 'usb':
                 logger.info(f"Initializing USB camera {self.camera_index}...")
@@ -97,13 +110,14 @@ class YOLODetector:
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
                 
                 if not self.cap.isOpened():
-                    raise RuntimeError(f"Failed to open camera {self.camera_index}")
+                    raise RuntimeError(f"❌ Failed to open USB camera {self.camera_index}. Check if camera is connected (ls /dev/video*)")
                 
                 logger.info(f"✅ USB camera initialized ({self.width}x{self.height})")
                 
         except Exception as e:
             logger.error(f"Failed to initialize camera: {e}")
             self.cap = None
+            raise
     
     def capture_frame(self):
         """

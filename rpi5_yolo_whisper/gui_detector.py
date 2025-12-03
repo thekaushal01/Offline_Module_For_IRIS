@@ -51,14 +51,21 @@ class GUIObjectDetector:
         
         # Initialize YOLO
         logger.info("Initializing YOLO detector...")
-        self.yolo = YOLODetector(
-            model_path=self.config['yolo_model'],
-            confidence_threshold=self.config['yolo_confidence'],
-            camera_type=self.config['camera_type'],
-            camera_index=self.config['camera_index'],
-            width=self.config['camera_width'],
-            height=self.config['camera_height']
-        )
+        logger.info(f"Camera type: {self.config['camera_type']}")
+        
+        try:
+            self.yolo = YOLODetector(
+                model_path=self.config['yolo_model'],
+                confidence_threshold=self.config['yolo_confidence'],
+                camera_type=self.config['camera_type'],
+                camera_index=self.config['camera_index'],
+                width=self.config['camera_width'],
+                height=self.config['camera_height']
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize camera: {e}")
+            self.tts.speak("Camera initialization failed. Please check camera connection.")
+            raise
         
         # Detection state
         self.running = False

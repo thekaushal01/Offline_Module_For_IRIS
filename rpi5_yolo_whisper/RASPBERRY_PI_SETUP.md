@@ -77,6 +77,18 @@ CAMERA_INDEX=0   # Try 0, 1, 2 if you have multiple cameras
 
 ### Step 4: Test Installation
 
+**Run Camera Diagnostics (Recommended):**
+```bash
+chmod +x diagnose_camera.sh
+./diagnose_camera.sh
+```
+This will check:
+- Pi Camera detection
+- Camera configuration
+- Required Python packages
+- Provide specific fix recommendations
+
+**Manual Component Tests:**
 ```bash
 source venv/bin/activate
 
@@ -214,7 +226,13 @@ sudo apt-get install python3-tk
 
 ### Problem: Camera not detected
 
-**Check Pi Camera:**
+**🔍 Run Diagnostics First:**
+```bash
+./diagnose_camera.sh
+```
+This script will automatically check everything and tell you exactly what's wrong!
+
+**Manual Checks for Pi Camera:**
 ```bash
 # Check if camera is detected
 vcgencmd get_camera
@@ -228,15 +246,28 @@ sudo raspi-config
 # Go to: Interface Options → Camera → Enable
 ```
 
-**If camera still not working:**
-```bash
-# Check ribbon cable connection (make sure it's secure)
-# Reboot after enabling camera
-sudo reboot
+**Common Pi Camera Issues:**
 
-# Check for picamera2 installation
-pip list | grep picamera2
-```
+1. **Camera not detected (supported=0 detected=0)**
+   - Ribbon cable not properly connected
+   - Check: Blue side faces camera module, contacts face connectors
+   - Make sure cable is fully inserted into both connectors
+
+2. **Camera supported but not detected (supported=1 detected=0)**
+   ```bash
+   # Enable camera interface
+   sudo raspi-config
+   # Interface Options → Camera → Enable
+   sudo reboot
+   ```
+
+3. **picamera2 not installed**
+   ```bash
+   sudo apt-get update
+   sudo apt-get install python3-picamera2
+   # Or try system-wide install
+   pip install picamera2
+   ```
 
 **For USB camera users:**
 ```bash
