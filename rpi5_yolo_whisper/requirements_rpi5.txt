@@ -1,0 +1,28 @@
+# Raspberry Pi 5 - YOLO + Whisper Requirements
+# Python 3.11+
+
+# Core dependencies
+numpy>=1.24.0
+python-dotenv>=1.0.0
+
+# YOLO Object Detection
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+
+# Whisper Speech Recognition (faster-whisper for Pi optimization)
+faster-whisper>=1.0.0
+openai-whisper>=20231117
+
+# Audio processing
+sounddevice>=0.4.6
+soundfile>=0.12.1
+pyaudio>=0.2.13
+
+# Text-to-Speech (offline)
+pyttsx3>=2.90
+
+# Raspberry Pi specific
+picamera2>=0.3.16; platform_machine=="aarch64"
+
+# Utilities
+tqdm>=4.66.0
