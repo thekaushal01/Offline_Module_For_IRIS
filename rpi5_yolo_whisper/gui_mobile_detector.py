@@ -534,10 +534,10 @@ class MobileGUIDetector:
                 logger.info("✅ Wake word 'IRIS' detected!")
                 
                 # Pause detection while listening for command
-                was_detecting = self.is_detecting
+                was_detecting = self.detecting
                 if was_detecting:
                     logger.info("⏸️ Pausing detection to listen for command...")
-                    self.is_detecting = False
+                    self.detecting = False
                     time.sleep(0.2)  # Brief pause to let detection loop notice
                 
                 self.root.after(0, self._update_voice_status, "✅ IRIS detected! Say your command...", '#ffff00')
@@ -567,9 +567,9 @@ class MobileGUIDetector:
                     self.root.after(0, self.status_label.config,
                                   {'text': "🎤 No audio detected, say 'IRIS' again"})
                     # Resume detection if it was paused
-                    if was_detecting and not self.is_detecting:
+                    if was_detecting and not self.detecting:
                         logger.info("▶️ Resuming detection...")
-                        self.is_detecting = True
+                        self.detecting = True
                     time.sleep(1)
                     continue
                 
@@ -594,9 +594,9 @@ class MobileGUIDetector:
                     self.root.after(0, self.status_label.config,
                                   {'text': "🎤 Could not understand command, try again"})
                     # Resume detection if it was paused
-                    if was_detecting and not self.is_detecting:
+                    if was_detecting and not self.detecting:
                         logger.info("▶️ Resuming detection after unclear command...")
-                        self.is_detecting = True
+                        self.detecting = True
                     time.sleep(1)
                 
             except KeyboardInterrupt:
@@ -648,9 +648,9 @@ class MobileGUIDetector:
             self.status_label.config(text=f"✅ Announcing: '{command}'")
             self.announce_objects()
             # Resume detection if it was paused
-            if was_detecting and not self.is_detecting:
+            if was_detecting and not self.detecting:
                 logger.info("▶️ Resuming detection after announce...")
-                self.is_detecting = True
+                self.detecting = True
             
         # If nothing matches but command has any text, try to guess intent
         elif len(command_lower) > 0:
@@ -658,18 +658,18 @@ class MobileGUIDetector:
             self.status_label.config(text=f"❓ Unclear command: '{command}' - Say START or STOP")
             self.tts.speak("Say START or STOP")
             # Resume detection if it was paused
-            if was_detecting and not self.is_detecting:
+            if was_detecting and not self.detecting:
                 logger.info("▶️ Resuming detection after unclear command...")
-                self.is_detecting = True
+                self.detecting = True
             
         else:
             logger.warning(f"❌ Empty or unrecognized command")
             self.status_label.config(text=f"❌ No command heard - Try again")
             self.tts.speak("No command heard")
             # Resume detection if it was paused
-            if was_detecting and not self.is_detecting:
+            if was_detecting and not self.detecting:
                 logger.info("▶️ Resuming detection after empty command...")
-                self.is_detecting = True
+                self.detecting = True
     
     def _speak_and_start(self):
         """Speak then start detection (non-blocking)"""
