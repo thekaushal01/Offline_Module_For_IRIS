@@ -8,13 +8,11 @@ Complete visual assistance app combining:
 
 ## ✅ Features
 
-- 🎤 **Voice-activated object detection**: Say "IRIS" to activate
-- 🎯 **Real-time object detection**: YOLO11n optimized for Raspberry Pi 5
-- 🖥️ **GUI Mode**: Live video feed with bounding boxes (TigerVNC compatible)
-- 📱 **Remote Access**: Access via VNC from PC or phone
-- 🔌 **Fully offline**: No internet required after setup
-- 💬 **Natural language responses**: Describes what objects are detected
-- ✋ **Hands-free operation**: Wake word + voice commands
+- **Voice-activated object detection**: Say "IRIS" to activate
+- **Real-time object detection**: YOLO11n optimized for Raspberry Pi 5
+- **Fully offline**: No internet required after setup
+- **Natural language responses**: Describes what objects are detected
+- **Hands-free operation**: Wake word + voice commands
 
 ## 🚀 Quick Start for Raspberry Pi 5
 
@@ -41,20 +39,33 @@ This will:
 
 ### 3. Run the App
 
-**Option A: GUI Version (Recommended for TigerVNC)**
+**Option A: GUI Version with Real-Time Detection (Recommended)**
 ```bash
 source venv/bin/activate
-python main_gui.py
+python gui_detector.py
 ```
+- Shows live camera feed
+- Real-time object detection with bounding boxes
+- Auto-announces when new objects appear
+- Manual announce button available
+- Adjustable confidence threshold
 
-**Option B: Terminal Version (No GUI)**
+**Option B: Voice-Activated Version**
 ```bash
 source venv/bin/activate
 python main_rpi5.py
 ```
 
-### 4. Use Voice Commands
+### 4. Use the Application
 
+**GUI Version:**
+1. Click **"Start Detection"** to begin
+2. Objects will be detected in real-time
+3. New objects are automatically announced via TTS
+4. Click **"Announce Now"** to hear current detections
+5. Adjust confidence slider for more/fewer detections
+
+**Voice Version:**
 1. Say **"IRIS"** to activate
 2. Say **"What do you see?"** or **"Detect objects"**
 3. Camera will capture and detect objects
@@ -64,8 +75,8 @@ python main_rpi5.py
 
 ```
 rpi5_yolo_whisper/
-├── main_rpi5.py                    # Terminal version (voice-only)
-├── main_gui.py                     # GUI version (with live video)
+├── gui_detector.py                 # GUI version with real-time detection (NEW!)
+├── main_rpi5.py                    # Voice-activated version
 ├── yolo_detector.py                # YOLO11 object detection module
 ├── whisper_stt.py                  # Whisper speech-to-text
 ├── offline_tts.py                  # Offline text-to-speech
@@ -107,49 +118,6 @@ TTS_ENGINE=pyttsx3
 TTS_RATE=150
 TTS_VOLUME=1.0
 ```
-
-## 🖥️ GUI Mode (TigerVNC)
-
-The GUI version (`main_gui.py`) provides a visual interface perfect for TigerVNC remote access:
-
-### Features
-- 📺 Live camera feed with real-time object detection
-- 🎯 Bounding boxes with labels and confidence scores
-- 📊 Detection summary panel showing object counts
-- 🔴 Visual indicator when voice is active
-- ⌨️ Keyboard controls for manual operation
-
-### Quick Start with VNC
-
-```bash
-# Install TigerVNC (if not installed)
-sudo apt-get install tigervnc-standalone-server
-
-# Set VNC password
-vncpasswd
-
-# Start VNC server
-vncserver :1 -geometry 1280x720 -depth 24
-
-# In VNC session, run:
-cd ~/rasp-object-detection/rpi5_yolo_whisper
-source venv/bin/activate
-export DISPLAY=:1
-python main_gui.py
-```
-
-### Keyboard Controls
-- `Q` - Quit application
-- `D` - Detect objects immediately
-- `S` - Save screenshot with detections
-
-### Connect from PC/Phone
-1. Install VNC Viewer on your device
-2. Connect to `<raspberry-pi-ip>:5901`
-3. Enter your VNC password
-4. The GUI will display with live video feed
-
-**📖 See [TIGERVNC_SETUP.md](TIGERVNC_SETUP.md) for detailed GUI setup guide**
 
 ## 🎯 How It Works
 

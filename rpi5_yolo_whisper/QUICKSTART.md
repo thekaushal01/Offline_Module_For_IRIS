@@ -1,11 +1,5 @@
 # 🚀 Quick Start Guide - Raspberry Pi 5
 
-## ⭐ Already Have VNC Running?
-
-**See [SETUP_WITH_VNC.md](SETUP_WITH_VNC.md) for a streamlined guide!**
-
----
-
 ## For Raspberry Pi 5
 
 ### 1. Transfer Files to Raspberry Pi
@@ -55,20 +49,28 @@ Key settings:
 
 ### 4. Run the App
 
-**For TigerVNC / GUI Access:**
+**GUI Version (Recommended for beginners):**
 ```bash
 source venv/bin/activate
-python main_gui.py
+python gui_detector.py
 ```
 
-**For Terminal Only:**
+**Voice-Activated Version:**
 ```bash
 source venv/bin/activate
 python main_rpi5.py
 ```
 
-### 5. Use Voice Commands
+### 5. Using the Application
 
+**GUI Version:**
+1. Click **"Start Detection"** button
+2. Objects will be detected and shown with bounding boxes
+3. New objects are automatically announced via voice
+4. Click **"Announce Now"** to manually trigger announcement
+5. Use slider to adjust detection sensitivity
+
+**Voice Version:**
 1. Say **"IRIS"** to activate
 2. Say a command:
    - "What do you see?"
@@ -102,50 +104,6 @@ cd "d:\whisper rasp\rpi5_yolo_whisper"
 pip install ultralytics
 python main_rpi5.py
 ```
-
----
-
-## 🖥️ For TigerVNC / GUI Access
-
-### Setup TigerVNC on Raspberry Pi
-
-```bash
-# Install TigerVNC server
-sudo apt-get update
-sudo apt-get install -y tigervnc-standalone-server tigervnc-common
-
-# Set VNC password
-vncpasswd
-
-# Start VNC server
-vncserver :1 -geometry 1280x720 -depth 24
-```
-
-### Connect from Your PC/Phone
-
-1. **Install VNC Viewer** on your PC/phone
-2. **Connect to**: `<raspberry-pi-ip>:5901`
-3. **Enter password** you set with `vncpasswd`
-
-### Run GUI Application in VNC
-
-```bash
-cd ~/rasp-object-detection/rpi5_yolo_whisper
-source venv/bin/activate
-export DISPLAY=:1
-python main_gui.py
-```
-
-### GUI Features
-
-- 📺 **Live video feed** with real-time object detection
-- 🎯 **Bounding boxes** around detected objects with labels
-- 📊 **Detection summary panel** showing counts
-- 🎤 **Voice activation indicator** (red dot when listening)
-- ⌨️ **Keyboard shortcuts**:
-  - `Q` - Quit application
-  - `D` - Detect objects now (manual trigger)
-  - `S` - Save screenshot with detections
 
 ---
 

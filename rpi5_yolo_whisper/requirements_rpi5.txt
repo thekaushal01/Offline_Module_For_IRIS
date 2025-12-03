@@ -26,3 +26,6 @@ picamera2>=0.3.16; platform_machine=="aarch64"
 
 # Utilities
 tqdm>=4.66.0
+
+# GUI Support
+pillow>=10.0.0
