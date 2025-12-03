@@ -77,13 +77,13 @@ class WhisperRecognizer:
             logger.error(f"Error loading Whisper model: {e}")
             raise
     
-    def record_audio(self, duration=5, silence_threshold=0.01, max_silence_duration=2.0):
+    def record_audio(self, duration=5, silence_threshold=0.003, max_silence_duration=2.0):
         """
         Record audio from microphone with automatic silence detection
         
         Args:
             duration: Maximum recording duration in seconds
-            silence_threshold: Audio level below which is considered silence
+            silence_threshold: Audio level below which is considered silence (lowered for quiet mics)
             max_silence_duration: Stop recording after this many seconds of silence
             
         Returns:
@@ -152,6 +152,17 @@ class WhisperRecognizer:
         logger.info("Transcribing audio...")
         
         try:
+            # Amplify audio for low-volume microphones
+            original_max = np.abs(audio_data).max()
+            logger.info(f"Original audio amplitude: {original_max:.4f}")
+            
+            if original_max > 0:
+                # Normalize to use full dynamic range (amplify by up to 10x)
+                target_amplitude = 0.3  # Target peak amplitude
+                amplification_factor = min(target_amplitude / original_max, 10.0)
+                audio_data = audio_data * amplification_factor
+                logger.info(f"Amplified audio by {amplification_factor:.2f}x to {np.abs(audio_data).max():.4f}")
+            
             # Save audio to temporary file (Whisper expects file path)
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
                 tmp_path = tmp_file.name
@@ -166,9 +177,12 @@ class WhisperRecognizer:
                     language=self.language,
                     beam_size=5,
                     best_of=5,
-                    temperature=0,
+                    temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],  # Try multiple temperatures for low-quality audio
                     vad_filter=False,  # Disable VAD for low-volume microphones
                     condition_on_previous_text=False,
+                    no_speech_threshold=0.3,  # Lower threshold to detect more speech (default 0.6)
+                    compression_ratio_threshold=2.4,  # Accept lower quality audio
+                    log_prob_threshold=-1.5,  # More lenient probability threshold
                     # Note: If you have good mic volume and want to filter silence, 
                     # change vad_filter=True and uncomment below:
                     # vad_parameters=dict(
