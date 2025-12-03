@@ -20,9 +20,9 @@ cd ~/rasp-object-detection
 git pull origin main
 cd rpi5_yolo_whisper
 
-# 2. Install picamera2 system-wide
+# 2. Install required system packages
 sudo apt-get update
-sudo apt-get install python3-picamera2
+sudo apt-get install python3-picamera2 python3-pil.imagetk python3-tk
 
 # 3. Recreate virtual environment with system packages access
 deactivate  # If already activated

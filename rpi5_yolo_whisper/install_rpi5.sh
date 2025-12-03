@@ -30,6 +30,8 @@ sudo apt-get install -y \
     python3-pip \
     python3-venv \
     python3-dev \
+    python3-tk \
+    python3-pil.imagetk \
     libportaudio2 \
     libportaudiocpp0 \
     portaudio19-dev \
