@@ -114,6 +114,57 @@ class MobileGUIDetector:
             model_size='tiny',
             sample_rate=self.config['sample_rate']
         )
+        
+        # Initialize Sensors (Pi 5 with lgpio)
+        self.ultrasonic = None
+        self.ultrasonic_monitor = None
+        self.imu = None
+        self.fall_detector = None
+        self.fall_monitor = None
+        
+        try:
+            logger.info("Initializing HC-SR04 ultrasonic sensor...")
+            from ultrasonic_sensor_lgpio import UltrasonicSensor, UltrasonicMonitor
+            
+            self.ultrasonic = UltrasonicSensor(
+                trig_pin=int(os.getenv('ULTRASONIC_TRIG_PIN', '23')),
+                echo_pin=int(os.getenv('ULTRASONIC_ECHO_PIN', '24'))
+            )
+            
+            self.ultrasonic_monitor = UltrasonicMonitor(
+                self.ultrasonic,
+                update_interval=0.2  # 5Hz updates
+            )
+            self.ultrasonic_monitor.add_callback(self._on_distance_change)
+            self.ultrasonic_monitor.start()
+            
+            logger.info("✅ Ultrasonic sensor ready")
+        except Exception as e:
+            logger.warning(f"Ultrasonic sensor not available: {e}")
+        
+        try:
+            logger.info("Initializing MPU9250 fall detector...")
+            from fall_detector import MPU9250, FallDetector, FallMonitor
+            
+            self.imu = MPU9250(address=int(os.getenv('MPU9250_ADDRESS', '0x68'), 16))
+            
+            self.fall_detector = FallDetector(
+                self.imu,
+                tts_callback=lambda msg: threading.Thread(
+                    target=self.tts.speak, args=(msg,), daemon=True
+                ).start()
+            )
+            
+            self.fall_monitor = FallMonitor(
+                self.fall_detector,
+                sample_rate=50  # 50Hz sampling
+            )
+            self.fall_monitor.add_fall_callback(self._on_fall_detected)
+            self.fall_monitor.start()
+            
+            logger.info("✅ Fall detection ready")
+        except Exception as e:
+            logger.warning(f"Fall detector not available: {e}")
     
     def _create_gui(self):
         """Create mobile-ready GUI interface"""
@@ -711,6 +762,99 @@ class MobileGUIDetector:
         self.status_label.config(text="⏸ Detection stopped")
         logger.info("Detection stopped")
     
+    def _on_distance_change(self, distance_feet: float, description: str):
+        """
+        Callback for ultrasonic sensor distance changes
+        Combines distance with YOLO detections for richer announcements
+        """
+        try:
+            # Only announce if detection is active and last_detected_objects has content
+            if self.detecting and self.last_detected_objects and self.auto_announce_var.get():
+                current_time = time.time()
+                
+                # Cooldown to avoid spam
+                if current_time - self.last_announcement < self.announcement_cooldown:
+                    return
+                
+                # Get the most common object from recent detections
+                if self.last_detected_objects:
+                    most_common_object = list(self.last_detected_objects)[0]
+                    
+                    # Create combined announcement
+                    if distance_feet < 6.0:  # Only announce for close objects
+                        combined_message = f"{most_common_object} at {distance_feet:.1f} feet"
+                        
+                        # Speak in background thread
+                        threading.Thread(
+                            target=self.tts.speak,
+                            args=(combined_message,),
+                            daemon=True
+                        ).start()
+                        
+                        self.last_announcement = current_time
+                        logger.info(f"📢 Combined announcement: {combined_message}")
+                        
+                        # Emit event for app/SMTP
+                        self._emit_event('distance_detection', {
+                            'object': most_common_object,
+                            'distance_feet': round(distance_feet, 1),
+                            'description': description
+                        })
+        except Exception as e:
+            logger.error(f"Distance callback error: {e}")
+    
+    def _on_fall_detected(self):
+        """Callback for fall detection events"""
+        try:
+            logger.warning("🚨 FALL DETECTED!")
+            
+            # Visual alert in GUI
+            self.root.after(0, lambda: self.status_label.config(
+                text="🚨 FALL DETECTED!",
+                foreground='#ff0000'
+            ))
+            
+            # Reset status after 5 seconds
+            def reset_status():
+                time.sleep(5)
+                self.root.after(0, lambda: self.status_label.config(
+                    text="🎯 Detection running...",
+                    foreground='#00ff00'
+                ))
+            
+            threading.Thread(target=reset_status, daemon=True).start()
+            
+            # Emit critical event for app/SMTP
+            self._emit_event('fall_detected', {
+                'severity': 'critical',
+                'timestamp': time.time()
+            })
+            
+            logger.info("Fall event emitted to app")
+            
+        except Exception as e:
+            logger.error(f"Fall callback error: {e}")
+    
+    def _emit_event(self, event_type: str, payload: dict):
+        """
+        Emit event to file for app to consume
+        App can monitor this file and send SMTP alerts
+        """
+        try:
+            import json
+            event = {
+                'timestamp': time.time(),
+                'event': event_type,
+                'payload': payload
+            }
+            
+            event_file = os.getenv('EVENT_FILE', '/tmp/iris_events.jsonl')
+            with open(event_file, 'a') as f:
+                f.write(json.dumps(event) + '\n')
+                
+        except Exception as e:
+            logger.error(f"Error emitting event: {e}")
+    
     def _detection_loop(self):
         """Main detection loop - keeps camera feed running even when detection paused"""
         fps_time = time.time()
@@ -876,7 +1020,15 @@ class MobileGUIDetector:
         self.voice_listening = False
         self.running = False
         
-        # Cleanup
+        # Cleanup sensors
+        if self.ultrasonic_monitor:
+            self.ultrasonic_monitor.stop()
+        if self.ultrasonic:
+            self.ultrasonic.cleanup()
+        if self.fall_monitor:
+            self.fall_monitor.stop()
+        
+        # Cleanup other components
         if hasattr(self, 'yolo'):
             self.yolo.release()
         if hasattr(self, 'wake_detector'):

@@ -1,8 +1,8 @@
-# Additional requirements for sensor integration
+# Additional requirements for sensor integration (Raspberry Pi 5)
 # For visual assistance system with HC-SR04 and MPU9250
 
-# Ultrasonic sensor (pigpio already in requirements_rpi5.txt)
-pigpio>=1.78
+# GPIO library for Pi 5 (replaces pigpio)
+lgpio>=0.2.2.0
 
 # IMU sensor I2C communication
 smbus2>=0.4.2
