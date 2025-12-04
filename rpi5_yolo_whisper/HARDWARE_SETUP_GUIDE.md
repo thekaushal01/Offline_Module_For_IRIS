@@ -152,7 +152,16 @@ sudo nano /boot/firmware/config.txt
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y i2c-tools pigpio python3-pigpio
+sudo apt-get install -y i2c-tools python3-dev python3-setuptools
+
+# Install pigpio from source (not available in Trixie repos)
+wget https://github.com/joan2937/pigpio/archive/master.zip
+unzip master.zip
+cd pigpio-master
+make
+sudo make install
+cd ..
+rm -rf pigpio-master master.zip
 ```
 
 ### 3. Enable pigpio Daemon (for ultrasonic timing)

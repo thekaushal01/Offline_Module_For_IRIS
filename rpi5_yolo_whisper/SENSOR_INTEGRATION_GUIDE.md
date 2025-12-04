@@ -21,11 +21,21 @@ Before starting, ensure:
 cd ~/rasp-object-detection/rpi5_yolo_whisper
 source venv/bin/activate
 
-# Install sensor libraries
-pip install smbus2 pigpio
+# Install system dependencies
+sudo apt-get update
+sudo apt-get install -y i2c-tools python3-dev python3-setuptools
 
-# System packages for pigpio
-sudo apt-get install -y pigpio python3-pigpio
+# Install pigpio from source (not available in Trixie repos)
+wget https://github.com/joan2937/pigpio/archive/master.zip
+unzip master.zip
+cd pigpio-master
+make
+sudo make install
+cd ..
+rm -rf pigpio-master master.zip
+
+# Install Python packages in venv
+pip install smbus2 pigpio
 
 # Enable and start pigpio daemon
 sudo systemctl enable pigpiod
