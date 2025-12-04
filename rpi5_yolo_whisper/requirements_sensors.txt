@@ -1,0 +1,12 @@
+# Additional requirements for sensor integration
+# For visual assistance system with HC-SR04 and MPU9250
+
+# Ultrasonic sensor (pigpio already in requirements_rpi5.txt)
+pigpio>=1.78
+
+# IMU sensor I2C communication
+smbus2>=0.4.2
+
+# Already in requirements_rpi5.txt:
+# numpy>=1.24.0
+# pyttsx3>=2.90
