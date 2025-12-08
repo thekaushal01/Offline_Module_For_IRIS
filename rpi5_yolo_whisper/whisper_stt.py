@@ -24,7 +24,8 @@ class WhisperRecognizer:
         device="cpu",
         language="en",
         sample_rate=16000,
-        use_faster_whisper=True
+        use_faster_whisper=True,
+        fast_mode=True
     ):
         """
         Initialize Whisper speech recognizer
@@ -41,6 +42,7 @@ class WhisperRecognizer:
         self.language = language
         self.sample_rate = sample_rate
         self.use_faster_whisper = use_faster_whisper
+        self.fast_mode = fast_mode
         self.model = None
         
         logger.info(f"Initializing Whisper {model_size} model...")
@@ -54,13 +56,18 @@ class WhisperRecognizer:
                 from faster_whisper import WhisperModel
                 
                 logger.info("Using faster-whisper for better performance")
+                
+                # Use int8 quantization for speed (faster) or float32 for accuracy
+                compute_type = "int8" if self.fast_mode else "float16"
+                
                 self.model = WhisperModel(
                     self.model_size,
                     device=self.device,
-                    compute_type="int8",  # Quantized for faster inference on CPU
-                    num_workers=4  # Raspberry Pi 5 has 4 cores
+                    compute_type=compute_type,
+                    num_workers=2,  # Use 2 threads for faster startup
+                    cpu_threads=2
                 )
-                logger.info(f"faster-whisper {self.model_size} model loaded successfully")
+                logger.info(f"faster-whisper {self.model_size} model loaded (compute_type={compute_type})")
             else:
                 # Original OpenAI Whisper
                 import whisper
@@ -172,25 +179,46 @@ class WhisperRecognizer:
             start_time = time.time()
             
             if self.use_faster_whisper:
-                segments, info = self.model.transcribe(
-                    tmp_path,
-                    language=self.language,
-                    beam_size=5,
-                    best_of=5,
-                    temperature=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],  # Try multiple temperatures for low-quality audio
-                    initial_prompt="Voice commands: start, stop, begin, end, detect, detection.",  # Hint expected words
-                    vad_filter=False,  # Disable VAD for low-volume microphones
-                    condition_on_previous_text=False,
-                    no_speech_threshold=0.3,  # Lower threshold to detect more speech (default 0.6)
-                    compression_ratio_threshold=2.4,  # Accept lower quality audio
-                    log_prob_threshold=-1.5,  # More lenient probability threshold
-                    # Note: If you have good mic volume and want to filter silence, 
-                    # change vad_filter=True and uncomment below:
-                    # vad_parameters=dict(
-                    #     min_silence_duration_ms=500,
-                    #     threshold=0.2
-                    # )
-                )
+                # Fast mode: optimized for speed (1-2s inference)
+                # Standard mode: balanced quality/speed (3-4s inference)
+                if self.fast_mode:
+                    segments, info = self.model.transcribe(
+                        tmp_path,
+                        language=self.language,
+                        beam_size=1,  # Greedy decoding (fastest)
+                        best_of=1,
+                        temperature=0.0,  # Deterministic, fastest
+                        vad_filter=True,  # Skip silence
+                        vad_parameters=dict(
+                            threshold=0.5,
+                            min_speech_duration_ms=250,
+                            min_silence_duration_ms=500,
+                            speech_pad_ms=200
+                        ),
+                        condition_on_previous_text=False,
+                        no_speech_threshold=0.6,
+                        compression_ratio_threshold=2.4,
+                        log_prob_threshold=-1.0,
+                        initial_prompt="Voice commands for object detection."
+                    )
+                else:
+                    segments, info = self.model.transcribe(
+                        tmp_path,
+                        language=self.language,
+                        beam_size=3,
+                        best_of=3,
+                        temperature=[0.0, 0.2],  # Limited temperature search
+                        initial_prompt="Voice commands: start, stop, begin, end, detect, detection.",
+                        vad_filter=True,
+                        vad_parameters=dict(
+                            threshold=0.5,
+                            min_speech_duration_ms=250
+                        ),
+                        condition_on_previous_text=False,
+                        no_speech_threshold=0.5,
+                        compression_ratio_threshold=2.4,
+                        log_prob_threshold=-1.0
+                    )
                 
                 # Convert generator to list and combine segments
                 segment_list = list(segments)

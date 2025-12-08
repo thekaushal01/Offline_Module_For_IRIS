@@ -1,0 +1,85 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+venv311/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (download on Pi)
+*.pt
+*.onnx
+*.param
+*.bin
+models/*.pt
+models/*.onnx
+models/*.param
+models/*.bin
+
+# Temporary files
+*.wav
+*.mp3
+*.tmp
+temp/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Environment variables (keep template only)
+.env.local
+
+# NCNN build artifacts
+ncnn/
+*.o
+*.a
+
+# Event files
+iris_events.jsonl
+/tmp/iris_events.jsonl
+
+# Screenshots
+screenshots/
+*.png
+*.jpg
+*.jpeg
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Test outputs
+test_output/

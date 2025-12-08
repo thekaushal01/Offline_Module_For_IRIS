@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import modules
-from yolo_detector import YOLODetector
+from smart_yolo_detector import SmartYOLODetector
 from whisper_stt import WhisperRecognizer
 from offline_tts import TextToSpeech
 from offline_wake_word import OfflineWakeWordDetector
@@ -56,9 +56,10 @@ class VoiceActivatedObjectDetector:
             'wake_word_threshold': float(os.getenv('WAKE_WORD_THRESHOLD', '0.6')),
             
             # Whisper settings
-            'whisper_model': os.getenv('WHISPER_MODEL', 'small'),
+            'whisper_model': os.getenv('WHISPER_MODEL', 'tiny'),
             'whisper_device': os.getenv('WHISPER_DEVICE', 'cpu'),
             'whisper_language': os.getenv('WHISPER_LANGUAGE', 'en'),
+            'whisper_fast_mode': os.getenv('WHISPER_FAST_MODE', 'true').lower() == 'true',
             
             # YOLO settings
             'yolo_model': os.getenv('YOLO_MODEL', 'models/yolo11n.pt'),
@@ -100,7 +101,7 @@ class VoiceActivatedObjectDetector:
             
             # Initialize YOLO Detector
             logger.info("Initializing YOLO Object Detector...")
-            self.yolo = YOLODetector(
+            self.yolo = SmartYOLODetector(
                 model_path=self.config['yolo_model'],
                 confidence_threshold=self.config['yolo_confidence'],
                 camera_type=self.config['camera_type'],
@@ -116,7 +117,8 @@ class VoiceActivatedObjectDetector:
                 device=self.config['whisper_device'],
                 language=self.config['whisper_language'],
                 sample_rate=self.config['sample_rate'],
-                use_faster_whisper=True
+                use_faster_whisper=True,
+                fast_mode=self.config['whisper_fast_mode']
             )
             
             # Initialize Wake Word Detector

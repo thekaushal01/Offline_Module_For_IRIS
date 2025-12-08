@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 
-from yolo_detector import YOLODetector
+from smart_yolo_detector import SmartYOLODetector
 from offline_tts import TextToSpeech
 from offline_wake_word import OfflineWakeWordDetector
 from whisper_stt import WhisperRecognizer
@@ -71,7 +71,8 @@ class MobileGUIDetector:
             'tts_rate': int(os.getenv('TTS_RATE', '150')),
             'tts_volume': float(os.getenv('TTS_VOLUME', '1.0')),
             'wake_word': os.getenv('WAKE_WORD', 'iris'),
-            'whisper_model': os.getenv('WHISPER_MODEL', 'small'),
+            'whisper_model': os.getenv('WHISPER_MODEL', 'tiny'),
+            'whisper_fast_mode': os.getenv('WHISPER_FAST_MODE', 'true').lower() == 'true',
             'sample_rate': int(os.getenv('SAMPLE_RATE', '16000')),
         }
         
@@ -89,7 +90,7 @@ class MobileGUIDetector:
         
         # Initialize YOLO
         logger.info("Initializing YOLO detector...")
-        self.yolo = YOLODetector(
+        self.yolo = SmartYOLODetector(
             model_path=self.config['yolo_model'],
             confidence_threshold=self.config['yolo_confidence'],
             camera_type=self.config['camera_type'],
@@ -104,7 +105,8 @@ class MobileGUIDetector:
             model_size=self.config['whisper_model'],
             device='cpu',
             sample_rate=self.config['sample_rate'],
-            use_faster_whisper=True
+            use_faster_whisper=True,
+            fast_mode=self.config['whisper_fast_mode']
         )
         
         # Initialize Wake Word Detector
@@ -484,7 +486,7 @@ class MobileGUIDetector:
         # Reinitialize camera with new resolution
         try:
             self.yolo.release()
-            self.yolo = YOLODetector(
+            self.yolo = SmartYOLODetector(
                 model_path=self.config['yolo_model'],
                 confidence_threshold=self.config['yolo_confidence'],
                 camera_type=self.config['camera_type'],
