@@ -60,21 +60,19 @@ sudo apt-get install -y \
     espeak \
     portaudio19-dev \
     libopencv-dev \
-    libatlas-base-dev \
+    libopenblas-dev \
     libhdf5-dev \
-    libhdf5-serial-dev \
     libharfbuzz0b \
     libwebp7 \
-    libjasper1 \
-    libilmbase25 \
-    libopenexr25 \
     libgstreamer1.0-0 \
     libavcodec-extra \
-    libavformat58 \
-    libswscale5 \
+    libavformat-dev \
+    libswscale-dev \
     i2c-tools \
     python3-smbus \
-    python3-lgpio
+    python3-lgpio \
+    libopenexr-dev \
+    libatlas-base-dev || true
 
 # ========================================
 # Step 3: Enable Hardware Interfaces
