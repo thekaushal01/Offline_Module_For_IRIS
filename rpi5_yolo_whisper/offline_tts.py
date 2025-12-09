@@ -1,6 +1,6 @@
 """
 Text-to-Speech Module
-Reads out text responses using pyttsx3 or gTTS
+Reads out text responses using Piper (recommended), pyttsx3 or gTTS
 """
 
 import logging
@@ -9,26 +9,35 @@ from pathlib import Path
 import tempfile
 import os
 
+# Try to import Piper TTS
+try:
+    from piper_tts import TextToSpeech as PiperTTS
+    PIPER_AVAILABLE = True
+except ImportError:
+    PIPER_AVAILABLE = False
+    
 logger = logging.getLogger(__name__)
 
 
 class TextToSpeech:
     """Text-to-speech engine for reading responses"""
     
-    def __init__(self, engine="pyttsx3", rate=150, volume=1.0, voice_index=None):
+    def __init__(self, engine="piper", rate=150, volume=1.0, voice_index=None, model=None):
         """
         Initialize TTS engine
         
         Args:
-            engine: TTS engine to use ("pyttsx3" or "gtts")
-            rate: Speech rate (words per minute)
+            engine: TTS engine to use ("piper", "pyttsx3", "gtts", or "auto")
+            rate: Speech rate (words per minute for pyttsx3, multiplier for Piper)
             volume: Volume level (0.0 to 1.0)
-            voice_index: Index of voice to use (None for default)
+            voice_index: Index of voice to use for pyttsx3 (None for default)
+            model: Piper voice model (e.g., "en_US-lessac-medium")
         """
         self.engine_type = engine
         self.rate = rate
         self.volume = volume
         self.voice_index = voice_index
+        self.model = model or os.getenv("PIPER_VOICE", "en_US-lessac-medium")
         self.tts_engine = None
         
         logger.info(f"Initializing TTS engine: {engine}")
@@ -37,7 +46,19 @@ class TextToSpeech:
     def _initialize_engine(self):
         """Initialize the selected TTS engine"""
         try:
-            if self.engine_type == "pyttsx3":
+            if self.engine_type == "auto":
+                # Auto-select: try Piper first, fallback to pyttsx3
+                if PIPER_AVAILABLE:
+                    try:
+                        self._initialize_piper()
+                        logger.info("✅ Using Piper TTS (best quality)")
+                        return
+                    except:
+                        logger.warning("Piper initialization failed, trying pyttsx3")
+                self._initialize_pyttsx3()
+            elif self.engine_type == "piper":
+                self._initialize_piper()
+            elif self.engine_type == "pyttsx3":
                 self._initialize_pyttsx3()
             elif self.engine_type == "gtts":
                 self._initialize_gtts()
@@ -47,6 +68,22 @@ class TextToSpeech:
         except Exception as e:
             logger.error(f"Error initializing TTS engine: {e}")
             raise
+    
+    def _initialize_piper(self):
+        """Initialize Piper TTS (recommended for Raspberry Pi)"""
+        if not PIPER_AVAILABLE:
+            raise ImportError("Piper TTS not available. Install with: ./install_piper.sh")
+        
+        # Convert pyttsx3 rate (words/min) to Piper rate (multiplier)
+        piper_rate = self.rate / 150.0 if self.rate > 10 else self.rate
+        
+        self.tts_engine = PiperTTS(
+            engine="piper",
+            rate=piper_rate,
+            volume=self.volume,
+            model=self.model
+        )
+        logger.info(f"✅ Piper TTS initialized with model: {self.model}")
     
     def _initialize_pyttsx3(self):
         """Initialize pyttsx3 (offline, good for Raspberry Pi)"""
