@@ -123,6 +123,26 @@ class MobileGUIDetector:
         self.imu = None
         self.fall_detector = None
         self.fall_monitor = None
+        self.buzzer = None
+        
+        # Proximity alert state
+        self.last_proximity_alert = 0
+        self.proximity_alert_cooldown = 2.0  # Seconds between alerts
+        self.last_distances = []  # Track last few distances to detect approach
+        
+        # Initialize Buzzer
+        try:
+            logger.info("Initializing buzzer...")
+            import lgpio
+            self.buzzer_pin = int(os.getenv('BUZZER_PIN', '17'))  # GPIO17 default
+            self.buzzer_handle = lgpio.gpiochip_open(4)  # Pi 5 chip
+            lgpio.gpio_claim_output(self.buzzer_handle, self.buzzer_pin)
+            lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 0)  # Off initially
+            self.buzzer = True
+            logger.info(f"✅ Buzzer ready on GPIO{self.buzzer_pin}")
+        except Exception as e:
+            logger.warning(f"Buzzer not available: {e}")
+            self.buzzer_handle = None
         
         try:
             logger.info("Initializing HC-SR04 ultrasonic sensor...")
@@ -766,44 +786,167 @@ class MobileGUIDetector:
     
     def _on_distance_change(self, distance_feet: float, description: str):
         """
-        Callback for ultrasonic sensor distance changes
-        Combines distance with YOLO detections for richer announcements
+        Enhanced proximity warning with buzzer alerts
+        Triggers alarm when person approaches within 5 feet
         """
         try:
-            # Only announce if detection is active and last_detected_objects has content
-            if self.detecting and self.last_detected_objects and self.auto_announce_var.get():
-                current_time = time.time()
-                
-                # Cooldown to avoid spam
-                if current_time - self.last_announcement < self.announcement_cooldown:
-                    return
-                
-                # Get the most common object from recent detections
-                if self.last_detected_objects:
-                    most_common_object = list(self.last_detected_objects)[0]
+            # Track distance history to detect approach
+            self.last_distances.append(distance_feet)
+            if len(self.last_distances) > 5:
+                self.last_distances.pop(0)
+            
+            # Detect if approaching (distance decreasing)
+            is_approaching = False
+            if len(self.last_distances) >= 3:
+                is_approaching = self.last_distances[-1] < self.last_distances[-3]
+            
+            current_time = time.time()
+            
+            # CRITICAL PROXIMITY ALERT - Within 5 feet
+            if distance_feet <= 5.0 and self.detecting:
+                # Check if we can alert (cooldown)
+                if current_time - self.last_proximity_alert >= self.proximity_alert_cooldown:
                     
-                    # Create combined announcement
-                    if distance_feet < 6.0:  # Only announce for close objects
-                        combined_message = f"{most_common_object} at {distance_feet:.1f} feet"
+                    # Get object type if available
+                    object_name = "obstacle"
+                    if self.last_detected_objects:
+                        object_name = list(self.last_detected_objects)[0]
+                    
+                    # Determine urgency level and message
+                    if distance_feet <= 2.0:
+                        urgency = "critical"
+                        if is_approaching:
+                            alert_message = f"⚠️ WARNING! {object_name} very close at {distance_feet:.1f} feet, coming towards you!"
+                        else:
+                            alert_message = f"⚠️ ALERT! {object_name} at {distance_feet:.1f} feet!"
+                        buzzer_pattern = "rapid"  # Fast beeps
                         
-                        # Speak in background thread
+                    elif distance_feet <= 3.5:
+                        urgency = "high"
+                        if is_approaching:
+                            alert_message = f"⚠️ Caution! {object_name} at {distance_feet:.1f} feet, approaching you"
+                        else:
+                            alert_message = f"Alert, {object_name} at {distance_feet:.1f} feet"
+                        buzzer_pattern = "medium"  # Medium beeps
+                        
+                    else:  # 3.5 - 5.0 feet
+                        urgency = "moderate"
+                        if is_approaching:
+                            alert_message = f"{object_name} at {distance_feet:.1f} feet, coming towards you"
+                        else:
+                            alert_message = f"{object_name} at {distance_feet:.1f} feet ahead"
+                        buzzer_pattern = "slow"  # Slow beeps
+                    
+                    # Trigger buzzer alarm
+                    if self.buzzer:
+                        threading.Thread(
+                            target=self._sound_buzzer,
+                            args=(buzzer_pattern,),
+                            daemon=True
+                        ).start()
+                    
+                    # Speak alert with urgency
+                    threading.Thread(
+                        target=self.tts.speak,
+                        args=(alert_message,),
+                        daemon=True
+                    ).start()
+                    
+                    # Visual alert in GUI
+                    if distance_feet <= 2.0:
+                        self.root.after(0, lambda: self.status_label.config(
+                            text=f"⚠️ CRITICAL: {object_name} at {distance_feet:.1f}ft",
+                            foreground='#ff0000'
+                        ))
+                    elif distance_feet <= 3.5:
+                        self.root.after(0, lambda: self.status_label.config(
+                            text=f"⚠️ WARNING: {object_name} at {distance_feet:.1f}ft",
+                            foreground='#ff8800'
+                        ))
+                    else:
+                        self.root.after(0, lambda: self.status_label.config(
+                            text=f"⚠️ CAUTION: {object_name} at {distance_feet:.1f}ft",
+                            foreground='#ffff00'
+                        ))
+                    
+                    self.last_proximity_alert = current_time
+                    self.last_announcement = current_time
+                    
+                    logger.warning(f"� PROXIMITY ALERT: {alert_message}")
+                    
+                    # Emit critical proximity event
+                    self._emit_event('proximity_alert', {
+                        'object': object_name,
+                        'distance_feet': round(distance_feet, 1),
+                        'urgency': urgency,
+                        'approaching': is_approaching,
+                        'message': alert_message
+                    })
+            
+            # Normal announcement for objects 5-10 feet (only if auto-announce is on)
+            elif 5.0 < distance_feet <= 10.0 and self.detecting and self.auto_announce_var.get():
+                if current_time - self.last_announcement >= self.announcement_cooldown:
+                    if self.last_detected_objects:
+                        object_name = list(self.last_detected_objects)[0]
+                        message = f"{object_name} at {distance_feet:.1f} feet"
+                        
                         threading.Thread(
                             target=self.tts.speak,
-                            args=(combined_message,),
+                            args=(message,),
                             daemon=True
                         ).start()
                         
                         self.last_announcement = current_time
-                        logger.info(f"📢 Combined announcement: {combined_message}")
+                        logger.info(f"📢 Detection: {message}")
                         
-                        # Emit event for app/SMTP
                         self._emit_event('distance_detection', {
-                            'object': most_common_object,
+                            'object': object_name,
                             'distance_feet': round(distance_feet, 1),
                             'description': description
                         })
+            
         except Exception as e:
             logger.error(f"Distance callback error: {e}")
+    
+    def _sound_buzzer(self, pattern: str):
+        """
+        Sound buzzer with different patterns based on urgency
+        
+        Args:
+            pattern: 'rapid' (< 2ft), 'medium' (2-3.5ft), 'slow' (3.5-5ft)
+        """
+        if not self.buzzer_handle:
+            return
+        
+        try:
+            import lgpio
+            
+            if pattern == "rapid":
+                # Very close - rapid beeping
+                for _ in range(5):
+                    lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 1)
+                    time.sleep(0.1)
+                    lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 0)
+                    time.sleep(0.1)
+                    
+            elif pattern == "medium":
+                # Moderate distance - medium beeping  
+                for _ in range(3):
+                    lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 1)
+                    time.sleep(0.2)
+                    lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 0)
+                    time.sleep(0.2)
+                    
+            elif pattern == "slow":
+                # Further away - slow beeping
+                for _ in range(2):
+                    lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 1)
+                    time.sleep(0.3)
+                    lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 0)
+                    time.sleep(0.3)
+                    
+        except Exception as e:
+            logger.error(f"Buzzer error: {e}")
     
     def _on_fall_detected(self):
         """Callback for fall detection events"""
@@ -1021,6 +1164,16 @@ class MobileGUIDetector:
         self.detecting = False
         self.voice_listening = False
         self.running = False
+        
+        # Cleanup buzzer
+        if self.buzzer_handle:
+            try:
+                import lgpio
+                lgpio.gpio_write(self.buzzer_handle, self.buzzer_pin, 0)  # Turn off
+                lgpio.gpiochip_close(self.buzzer_handle)
+                logger.info("🔒 Buzzer GPIO closed")
+            except:
+                pass
         
         # Cleanup sensors
         if self.ultrasonic_monitor:
