@@ -1,6 +1,6 @@
 # 🤖 Raspberry Pi Voice-Activated Object Detection
 
-Voice-controlled object detection system with GUI for Raspberry Pi 5. Access via TigerVNC from PC or phone.
+Voice-controlled object detection system with GUI for Raspberry Pi 5. Access via TigerVNC from PC/Laptop or CLI using SSH.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue)
 ![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-red)
@@ -19,16 +19,16 @@ Voice-controlled object detection system with GUI for Raspberry Pi 5. Access via
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Voice-Activated Object Detection        FPS: 20        │
-│ Status: Listening for 'IRIS'...       [🔴 LISTENING]  │
+│ Voice-Activated Object Detection        FPS: 20         │
+│ Status: Listening for 'IRIS'...       [🔴 LISTENING]   │
 ├─────────────────────────────────────────────┬───────────┤
 │         [Person] 87%                        │Detections:│
 │           ┌──────────┐                      │Total: 3   │
 │           │  Person  │                      │           │
 │           └──────────┘                      │person: 1  │
-│    [Chair] 92%  [Chair] 85%                │chair: 2   │
-│       ┌────┐       ┌────┐                  │           │
-│       └────┘       └────┘                  │Summary:   │
+│    [Chair] 92%  [Chair] 85%                 │chair: 2   │
+│       ┌────┐       ┌────┐                   │           │
+│       └────┘       └────┘                   │Summary:   │
 │                                             │"I see one │
 │         LIVE CAMERA FEED                    │ person    │
 │                                             │ and two   │
@@ -69,7 +69,7 @@ export DISPLAY=:1
 python main_gui.py
 ```
 
-### 5. Connect from PC/Phone
+### 5. Connect from PC/Laptop
 
 1. Install VNC Viewer
 2. Connect to `<raspberry-pi-ip>:5901`
@@ -149,7 +149,9 @@ MIT License - see LICENSE file for details
 
 **Aniket-1149**
 - GitHub: [@Aniket-1149](https://github.com/Aniket-1149)
-- Repository: [rasp-object-detection](https://github.com/Aniket-1149/rasp-object-detection)
+  
+**Kaushal Kumar**
+- GitHub: [@thekaushal01](https://github.com/thekaushal01)
 
 ## 🙏 Acknowledgments
 
